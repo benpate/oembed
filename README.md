@@ -5,3 +5,9 @@
 [![Codecov](https://img.shields.io/codecov/c/github/benpate/oembed.svg?style=flat-square)](https://codecov.io/gh/benpate/oembed)
 [![Go Report Card](https://goreportcard.com/badge/github.com/benpate/oembed?style=flat-square)](https://goreportcard.com/report/github.com/benpate/oembed)
 [![Version](https://img.shields.io/github/v/release/benpate/oembed?include_prereleases&style=flat-square&color=brightgreen)](https://github.com/benpate/oembed/releases)
+
+Portions of this code inspired or duplicated from:
+* https://github.com/dyatlov/go-oembed
+* https://github.com/artyom/oembed
+* https://oembed.com/
+
