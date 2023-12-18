@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/PuerkitoBio/goquery v1.8.1
-	github.com/benpate/derp v0.28.2
+	github.com/benpate/derp v0.30.0
 	github.com/benpate/re v0.2.1
 )
 
