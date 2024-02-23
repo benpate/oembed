@@ -3,12 +3,12 @@ module github.com/benpate/oembed
 go 1.18
 
 require (
-	github.com/PuerkitoBio/goquery v1.8.1
+	github.com/PuerkitoBio/goquery v1.9.0
 	github.com/benpate/derp v0.30.0
 	github.com/benpate/re v0.2.2
 )
 
 require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect
-	golang.org/x/net v0.20.0 // indirect
+	golang.org/x/net v0.21.0 // indirect
 )
