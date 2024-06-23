@@ -1,13 +1,6 @@
 package oembed
 
-import (
-	"bytes"
-	"net/http"
-
-	"github.com/PuerkitoBio/goquery"
-	"github.com/benpate/derp"
-	"github.com/benpate/re"
-)
+/* TODO: These implementations are not complete...
 
 // LookupWithURI uses a URI to find the oEmbed endpoint
 func LookupWithURI(uri string) (string, error) {
@@ -37,9 +30,11 @@ func ParseResponse(response *http.Response) (OEmbed, error) {
 	return ParseGoQuery(document)
 }
 
+
 // ParseGoQuery searches a goquery document for oEmbed metadata.
 // This is provided as a shortcut for use cases where the caller
 // has already parsed the HTML document into a goquery object.
 func ParseGoQuery(goquery *goquery.Document) (OEmbed, error) {
 	return OEmbed{}, nil
 }
+*/
