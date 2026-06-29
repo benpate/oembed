@@ -13,7 +13,7 @@ func ParseResponse(response *http.Response) (OEmbed, error) {
 	const location = "oembed.ParseResponse"
 
 	// Read the document body
-	body, err := re.ReadResponseBody(response)
+	body, err := re.ReadResponseBody(response, re.DefaultMaximum)
 
 	if err != nil {
 		return OEmbed{}, derp.Wrap(err, location, "Error reading request body")
