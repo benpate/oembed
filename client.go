@@ -19,13 +19,13 @@ import (
 // with NewClient; the zero-config NewClient() works well, using the embedded
 // provider registry and safe network defaults.
 type Client struct {
-	registry        Registry
-	maxWidth        int
-	maxHeight       int
-	allowPrivateIPs bool
-	maxBodySize     int64
-	userAgent       string
-	roundTripper    func(http.RoundTripper) http.RoundTripper
+	registry        Registry                                  // provider registry consulted before any page fetch
+	maxWidth        int                                       // default "maxwidth" parameter; zero omits it
+	maxHeight       int                                       // default "maxheight" parameter; zero omits it
+	allowPrivateIPs bool                                      // TRUE lets fetches reach non-public IPs (tests only)
+	maxBodySize     int64                                     // cap on bytes read from any response body
+	userAgent       string                                    // User-Agent sent with every request
+	roundTripper    func(http.RoundTripper) http.RoundTripper // optional middleware wrapped around the guarded transport
 }
 
 // NewClient returns a Client configured by the given options. With no options
@@ -343,6 +343,7 @@ func validateHTTPURL(rawURL string) error {
 		return derp.BadRequest(location, "URL must include a host", rawURL)
 	}
 
+	// This URL is cleared for takeoff.
 	return nil
 }
 

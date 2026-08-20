@@ -10,9 +10,9 @@ import (
 // This is where every other plan falls back to, because a boring preview
 // beats an injected script.
 type EmbedLink struct {
-	Title        string
-	ThumbnailURL string
-	TargetURL    string
+	Title        string // link text, falling back to TargetURL when empty
+	ThumbnailURL string // preview image for the resource, when the provider sent one
+	TargetURL    string // href the anchor points at
 }
 
 // embedPlan marks this type as one of the closed set of Embed plans.

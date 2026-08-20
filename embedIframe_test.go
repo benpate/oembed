@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// FuzzExtractIframe asserts the iframe extractor never panics, and that any
+// successful extraction yields an https src with no event handlers surviving.
 func FuzzExtractIframe(f *testing.F) {
 
 	f.Add(`<iframe src="https://x.example/v" width="1" height="2"></iframe>`)

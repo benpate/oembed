@@ -20,8 +20,8 @@ type EmbedPolicy struct {
 	AllowSandbox bool
 
 	// MaxWidth and MaxHeight clamp plan dimensions. Zero means no clamp.
-	MaxWidth  int
-	MaxHeight int
+	MaxWidth  int // widest dimension a plan may carry
+	MaxHeight int // tallest dimension a plan may carry
 }
 
 // clampDimensions applies the policy's maximum dimensions, preserving zero

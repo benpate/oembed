@@ -20,14 +20,14 @@ var providersJSON []byte
 // returns the provider's oEmbed endpoint. Registries are immutable after
 // construction and safe for concurrent use without locks.
 type Registry struct {
-	matchers []schemeMatcher
+	matchers []schemeMatcher // every provider scheme, in registry order
 }
 
 // schemeMatcher pairs one precompiled scheme pattern with its already-resolved
 // endpoint, so matching a URL never re-parses patterns.
 type schemeMatcher struct {
-	expression *regexp.Regexp
-	endpoint   Endpoint
+	expression *regexp.Regexp // anchored form of one providers.json scheme pattern
+	endpoint   Endpoint       // endpoint this pattern resolves to
 }
 
 // NewRegistry builds a Registry from a provider list, precompiling every

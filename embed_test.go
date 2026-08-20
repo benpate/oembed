@@ -165,6 +165,3 @@ func TestEmbed_RenderEscapesTitles(t *testing.T) {
 
 	require.NotContains(t, rendered, "<script>")
 }
-
-// FuzzExtractIframe asserts the iframe extractor never panics, and that any
-// successful extraction yields an https src with no event handlers surviving.

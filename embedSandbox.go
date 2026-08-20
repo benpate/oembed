@@ -12,7 +12,7 @@ import (
 // the host page, which un-sandboxes everything.
 type EmbedSandbox struct {
 	HTML          string // provider markup, escaped into srcdoc by Render
-	Width, Height int
+	Width, Height int    // frame dimensions; zero means unset
 }
 
 // embedPlan marks this type as one of the closed set of Embed plans.

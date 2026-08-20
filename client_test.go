@@ -501,8 +501,8 @@ func TestClient_Fetch_CanceledContext(t *testing.T) {
 
 // countingRoundTripper wraps a transport and counts the requests through it.
 type countingRoundTripper struct {
-	next  http.RoundTripper
-	count int
+	next  http.RoundTripper // transport the calls are delegated to
+	count int               // number of requests seen
 }
 
 // RoundTrip delegates to the wrapped transport, counting the call.
