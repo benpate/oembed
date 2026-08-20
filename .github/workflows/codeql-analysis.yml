@@ -10,13 +10,15 @@
 # supported CodeQL languages.
 #
 name: "CodeQL"
+permissions:
+  contents: read
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, dev ]
   pull_request:
     # The branches below must be a subset of the branches above
-    branches: [ main ]
+    branches: [ main, dev ]
   schedule:
     - cron: '27 14 * * 1'
 
