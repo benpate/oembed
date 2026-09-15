@@ -104,7 +104,7 @@ type ClientOption func(*Client)
 type Registry struct { /* unexported fields */ }
 ```
 
-Matches candidate URLs against provider scheme patterns. **Immutable after construction and safe for concurrent use without locks** — all pattern compilation and endpoint resolution happens in `NewRegistry`, so `Find` is a lock-free loop over ready matchers.
+Matches candidate URLs against provider scheme patterns. **Immutable after construction and safe for concurrent use without locks** — all pattern compilation, endpoint resolution, and host indexing happens in `NewRegistry`, so `Find` is a lock-free lookup over ready matchers.
 
 ### `func DefaultRegistry() Registry`
 
@@ -120,12 +120,15 @@ Builds a registry from your own provider list, precompiling every scheme pattern
 
 - Endpoints with no schemes are discovery-only and never scheme-matched.
 - Patterns that fail to compile are **silently dropped** — they simply never match.
+- Each pattern is also filed in a host index, so `Find` can skip the patterns no candidate authority could reach.
 
 ### `func (Registry) Find(targetURL string) (Endpoint, bool)`
 
 Returns the endpoint of the first provider scheme that matches, in registry order. Reports `false` when nothing matches.
 
 A `*` in the authority compiles to `[^/]*` and **must not cross a `/`** — this is a security boundary, or `https://*.youtube.com/...` would match `https://evil.com/x.youtube.com/...`. Path wildcards compile to `.*` on purpose, since they legitimately match query strings. Scheme and host match case-insensitively; path matches case-sensitively.
+
+Lookup is indexed by the candidate's authority rather than scanning all 838 patterns: **about 1.7 µs and zero allocations**, against ~100 µs for the scan it replaced. The index only *selects* candidates — the compiled pattern still decides every match, so the wildcard-scope boundary above is unchanged. Inputs with no authority to key (`spotify:track:xyz`) fall back to the full scan and answer identically.
 
 ### `func (Registry) Size() int`
 
@@ -260,7 +263,7 @@ Validates, encodes, and writes with the correct `Content-Type`, in one call.
 - **Encodes before touching the `ResponseWriter`**: an encoding failure never leaves a half-written 200 behind.
 - Content types are `application/json; charset=utf-8` and `text/xml; charset=utf-8` (§2.3.1).
 
-Both orderings are load-bearing. Keep them.
+Both orderings are important. Keep them.
 
 ---
 

@@ -14,7 +14,7 @@ See [README.md](README.md) for the tour and [API.md](API.md) for the full refere
 
 `Version` is the only `lenient.String` field, because it is the only field providers are known to mistype. Widening that is a deliberate decision, not a cleanup — every plain `string` field made tolerant also drags its comparison constants into the named type.
 
-**go.mod carries a local `replace` for rosetta** until `lenient` ships in a tag. Don't run `go mod tidy` and keep the result.
+`lenient` now ships in a rosetta tag, so **go.mod carries no `replace`**. If one is ever added back for local work, don't run `go mod tidy` and keep the result.
 
 ## Strict on send, lenient on receive — two validators, on purpose
 
@@ -24,9 +24,26 @@ See [README.md](README.md) for the tour and [API.md](API.md) for the full refere
 
 `NewRegistry` precompiles every scheme pattern and pre-resolves every endpoint ({format} substitution, format choice, format-parameter decision), so `Find` is a lock-free loop over ready matchers. Never add post-construction mutation. Patterns that fail to compile (invalid UTF-8 — a real fuzz finding) are silently dropped: they simply never match.
 
-`Find` is a LINEAR SCAN over all 838 patterns (~93µs/call, 0 allocs) — a host-index optimization is specced but NOT built: `emissary-specs/projects/OEMBED-REGISTRY-HOST-INDEX.md`. If you implement it, the map is a PREFILTER and the regex must still run; the wildcard-in-authority rule above is why.
+`Find` consults a host index built by `NewRegistry` — see the next section for the rules that keep it honest.
 
 The embedded snapshot is compiled in `init()` (~5.9ms, ~3.9MB retained) and `Client.registry` is a plain `Registry` VALUE, defaulted in `NewClient`. Don't reintroduce a `*Registry` or lazy resolution to "save" that cost — the nil-able field carried a three-way ambiguity (unset / set / set-to-empty) that made an explicitly empty `WithRegistry` indistinguishable from no registry at all. A corrupt snapshot panics at init on purpose; it is a build defect, not a runtime condition.
+
+## The host index is a prefilter; `findLinear` is the oracle that proves it
+
+`Find` no longer scans all 838 patterns. `NewRegistry` buckets each matcher by the authority its pattern can match — `byAuthority` for a literal (`vimeo.com`), `bySuffix` for a `*.` wildcard (keyed `.youtube.com`), `alwaysCheck` for the 5 that fit neither — and `Find` evaluates only the eligible ones. That is ~1.7µs instead of ~100µs, still zero allocations.
+
+**The map selects candidates; the regex still decides.** A bucket hit that returned an endpoint on its own would re-open the wildcard-scope hole above, matching `https://evil.com/x.youtube.com/`.
+
+**`findLinear` stays in the package forever.** It is the fallback for inputs the index cannot key, and it is the oracle `FuzzRegistry_FindEquivalence` and `TestRegistry_FindIndexEquivalence` check every answer against. Deleting it to "remove dead code" removes the only thing that makes the index auditable.
+
+Four exactness rules hold the equivalence up, and each one breaks silently — a provider that quietly stops matching, never an error:
+
+- **A `*.example.com` bucket is consulted for `sub.example.com` but NEVER for the apex `example.com`.** The compiled form is `[^/]*\.example\.com`, which requires the literal dot.
+- **Candidates from several buckets are re-sorted by matcher index.** `Find` answers with the FIRST match in registry order, and bucket order is not registry order.
+- **Only pure-ASCII authorities are bucketed, on both sides.** `(?i)` folds some ASCII letters onto non-ASCII runes (`s` matches U+017F, `k` matches U+212A KELVIN SIGN) where `strings.ToLower` does not, so anything else takes `findLinear`.
+- **A pattern whose scheme carries `:` or `/` is never bucketed.** Such a scheme can match text containing `://`, so the candidate's first `://` would not be the one the pattern split on, and the two authorities would disagree.
+
+`scopeguard` reports that `index` in `Registry.add` can move into the switch header. **It cannot** — that reads `len(registry.matchers)` after the append and files every matcher one slot past itself. Four tests catch it; the suggestion is a false positive.
 
 ## Wildcard scope is a security boundary
 

@@ -151,7 +151,7 @@ func TestCompileSchemePattern(t *testing.T) {
 	test := func(name string, pattern string, candidate string, expectMatch bool) {
 		t.Run(name, func(t *testing.T) {
 
-			expression, err := compileSchemePattern(pattern)
+			expression, _, err := compileSchemePattern(pattern)
 			require.NoError(t, err)
 
 			assert.Equal(t, expectMatch, expression.MatchString(candidate),
@@ -251,7 +251,7 @@ func FuzzCompileSchemePattern(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, pattern string, candidate string) {
 
-		expression, err := compileSchemePattern(pattern)
+		expression, _, err := compileSchemePattern(pattern)
 
 		// Property: compilation only fails on invalid UTF-8 (regexp rejects it),
 		// and never panics.
@@ -325,4 +325,248 @@ func TestNewClient_RegistryDefaults(t *testing.T) {
 		_, found := client.registry.Find("https://www.youtube.com/watch?v=1")
 		assert.False(t, found)
 	})
+}
+
+// synthesizeURL builds a URL from a scheme pattern by filling in its
+// wildcards, so the result matches the pattern it came from.
+func synthesizeURL(pattern string) string {
+
+	scheme, rest, hasScheme := strings.Cut(pattern, "://")
+
+	if !hasScheme {
+		return strings.ReplaceAll(pattern, "*", "x")
+	}
+
+	authority, path, hasPath := strings.Cut(rest, "/")
+	targetURL := strings.ReplaceAll(scheme, "*", "https") + "://" + strings.ReplaceAll(authority, "*", "sub")
+
+	if hasPath {
+		targetURL += "/" + strings.ReplaceAll(path, "*", "x")
+	}
+
+	return targetURL
+}
+
+// TestRegistry_FindIndexEquivalence is the differential pass over the whole
+// embedded snapshot: every pattern is turned into a URL that matches it, plus
+// mutations that should not, and the host index must answer exactly as the
+// linear scan does.
+func TestRegistry_FindIndexEquivalence(t *testing.T) {
+
+	var providers []Provider
+	require.NoError(t, json.Unmarshal(providersJSON, &providers))
+
+	registry := DefaultRegistry()
+
+	agrees := func(targetURL string) {
+
+		wantEndpoint, wantFound := registry.findLinear(targetURL)
+		gotEndpoint, gotFound := registry.Find(targetURL)
+
+		require.Equal(t, wantFound, gotFound, "index disagrees with the linear scan for %q", targetURL)
+		require.Equal(t, wantEndpoint, gotEndpoint, "index returned a different endpoint for %q", targetURL)
+	}
+
+	patterns := 0
+
+	for _, provider := range providers {
+		for _, providerEndpoint := range provider.Endpoints {
+			for _, pattern := range providerEndpoint.Schemes {
+
+				patterns++
+				targetURL := synthesizeURL(pattern)
+
+				// A URL built from a pattern must still match something
+				if _, found := registry.findLinear(targetURL); !found {
+					t.Fatalf("pattern %q does not match its own synthesized URL %q", pattern, targetURL)
+				}
+
+				agrees(targetURL)
+
+				// Mutations that probe the authority and path boundaries
+				agrees(strings.ToUpper(targetURL))
+				agrees(targetURL + "/extra")
+				agrees(strings.Replace(targetURL, "://", "://evil.com/", 1))
+				agrees(strings.Replace(targetURL, "://", "://prefix.", 1))
+				agrees(strings.Replace(targetURL, "://", "://", 1) + ".evil.com")
+			}
+		}
+	}
+
+	assert.GreaterOrEqual(t, patterns, 800, "the snapshot lost most of its patterns")
+}
+
+// TestRegistry_HostIndexHazards names each way the host index could silently
+// diverge from the linear scan it replaced.
+func TestRegistry_HostIndexHazards(t *testing.T) {
+
+	build := func(schemesAndEndpoints ...string) Registry {
+
+		providers := make([]Provider, 0, len(schemesAndEndpoints)/2)
+
+		for offset := 0; offset < len(schemesAndEndpoints); offset += 2 {
+			providers = append(providers, Provider{
+				Endpoints: []ProviderEndpoint{{
+					Schemes: []string{schemesAndEndpoints[offset]},
+					URL:     schemesAndEndpoints[offset+1],
+				}},
+			})
+		}
+
+		return NewRegistry(providers)
+	}
+
+	t.Run("hazard 1: registry order survives bucketing", func(t *testing.T) {
+
+		// The suffix bucket is consulted after the exact bucket, but the
+		// suffix pattern is FIRST in registry order and must still win.
+		suffixFirst := build(
+			"https://*.example.com/*", "https://suffix.com/oembed",
+			"https://www.example.com/*", "https://exact.com/oembed",
+		)
+
+		endpoint, found := suffixFirst.Find("https://www.example.com/video")
+		require.True(t, found)
+		assert.Equal(t, "https://suffix.com/oembed", endpoint.URL)
+
+		// ...and the same pair in the other order resolves the other way
+		exactFirst := build(
+			"https://www.example.com/*", "https://exact.com/oembed",
+			"https://*.example.com/*", "https://suffix.com/oembed",
+		)
+
+		endpoint, found = exactFirst.Find("https://www.example.com/video")
+		require.True(t, found)
+		assert.Equal(t, "https://exact.com/oembed", endpoint.URL)
+	})
+
+	t.Run("hazard 2: a suffix pattern never matches the apex", func(t *testing.T) {
+
+		registry := build("https://*.example.com/*", "https://suffix.com/oembed")
+
+		_, found := registry.Find("https://example.com/video")
+		assert.False(t, found, "the apex must not reach the *. bucket")
+
+		_, found = registry.Find("https://sub.example.com/video")
+		assert.True(t, found)
+
+		_, found = registry.Find("https://deep.sub.example.com/video")
+		assert.True(t, found)
+
+		// The wildcard may match nothing at all, leaving a leading dot
+		_, found = registry.Find("https://.example.com/video")
+		assert.True(t, found)
+	})
+
+	t.Run("hazard 3: input with no authority falls back to the linear scan", func(t *testing.T) {
+
+		registry := build("spotify:*", "https://open.spotify.com/oembed")
+
+		_, found := registry.Find("spotify:track:123")
+		assert.True(t, found, "a pattern with no :// must not be skipped")
+
+		_, found = registry.Find("")
+		assert.False(t, found)
+
+		_, found = registry.Find("http:")
+		assert.False(t, found)
+	})
+
+	t.Run("hazard 4: the index is a prefilter, the pattern decides", func(t *testing.T) {
+
+		registry := build("https://*.youtube.com/*", "https://www.youtube.com/oembed")
+
+		_, found := registry.Find("https://evil.com/x.youtube.com/watch")
+		assert.False(t, found, "the authority wildcard must not cross a slash")
+
+		_, found = registry.Find("https://www.youtube.com.evil.com/watch")
+		assert.False(t, found)
+
+		_, found = registry.Find("https://evilyoutube.com/watch")
+		assert.False(t, found)
+	})
+
+	t.Run("hazard 5: a non-ASCII authority takes the linear scan", func(t *testing.T) {
+
+		// (?i)s matches U+017F LATIN SMALL LETTER LONG S, but ToLower leaves
+		// U+017F alone — so neither side can be keyed and both fall back.
+		agrees := func(registry Registry, targetURL string) {
+
+			wantEndpoint, wantFound := registry.findLinear(targetURL)
+			require.True(t, wantFound, "the regexp folds U+017F onto s for %q", targetURL)
+
+			gotEndpoint, gotFound := registry.Find(targetURL)
+			assert.Equal(t, wantFound, gotFound, targetURL)
+			assert.Equal(t, wantEndpoint, gotEndpoint, targetURL)
+		}
+
+		// A non-ASCII CANDIDATE against an ASCII pattern
+		agrees(build("https://s.example.com/*", "https://folded.com/oembed"), "https://ſ.example.com/video")
+
+		// ...and an ASCII candidate against a non-ASCII PATTERN
+		agrees(build("https://ſ.example.com/*", "https://folded.com/oembed"), "https://s.example.com/video")
+	})
+
+	t.Run("hazard 6: a scheme carrying : or / is never bucketed", func(t *testing.T) {
+
+		// An empty wildcard expansion lets this scheme match text containing
+		// "://", so the candidate's first "://" is not the pattern's.
+		registry := build(":*//://example.com/*", "https://colon.com/oembed")
+
+		wantEndpoint, wantFound := registry.findLinear("://://example.com/video")
+		require.True(t, wantFound, "the scheme swallows one :// of its own")
+
+		gotEndpoint, gotFound := registry.Find("://://example.com/video")
+		assert.Equal(t, wantFound, gotFound)
+		assert.Equal(t, wantEndpoint, gotEndpoint)
+	})
+}
+
+// FuzzRegistry_FindEquivalence is the property the whole index rests on: for
+// EVERY input, the indexed Find and the linear scan answer identically.
+func FuzzRegistry_FindEquivalence(f *testing.F) {
+
+	f.Add("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+	f.Add("https://youtube.com/watch?v=1")
+	f.Add("https://vimeo.com/1084537")
+	f.Add("https://WWW.YouTube.COM/watch?v=abc")
+	f.Add("https://evil.com/x.youtube.com/watch")
+	f.Add("https://www.youtube.com.evil.com/watch")
+	f.Add("spotify:track:4uLU6hMCjMI75M1A2tKUQC")
+	f.Add("")
+	f.Add("http:")
+	f.Add("://")
+	f.Add("https://")
+	f.Add("https://ſ.example.com/v")
+	f.Add("https://\xff\xfe/v")
+	f.Add("https://" + strings.Repeat(".", 4096))
+
+	f.Fuzz(func(t *testing.T, targetURL string) {
+
+		registry := DefaultRegistry()
+
+		wantEndpoint, wantFound := registry.findLinear(targetURL)
+		gotEndpoint, gotFound := registry.Find(targetURL)
+
+		if gotFound != wantFound {
+			t.Fatalf("index reports found=%v, linear scan reports found=%v, for %q", gotFound, wantFound, targetURL)
+		}
+
+		if gotEndpoint != wantEndpoint {
+			t.Fatalf("index returned %+v, linear scan returned %+v, for %q", gotEndpoint, wantEndpoint, targetURL)
+		}
+	})
+}
+
+// BenchmarkRegistry_Find_Linear keeps the pre-index cost measurable, so the
+// host index has a number to be compared against.
+func BenchmarkRegistry_Find_Linear(b *testing.B) {
+
+	b.ReportAllocs()
+
+	for b.Loop() {
+		if _, found := DefaultRegistry().findLinear("https://example-nobody-registered.com/video/1"); found {
+			b.Fatal("expected a registry miss")
+		}
+	}
 }

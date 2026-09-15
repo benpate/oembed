@@ -101,6 +101,7 @@ Conclusion: the serving logic (what records exist, who may see them) rightly sta
 - [x] **7.2 Lazy default registry.** Parse the embedded snapshot once via `sync.Once`, not at `init()`.
 - [x] **7.3 Streaming discovery.** The discovery parser tokenizes and stops at `</head>`/first-match where correct, rather than materializing a DOM for a multi-megabyte page.
 - [x] **7.4 Benchmarks in-repo** for registry match, discovery parse, and response unmarshal, so regressions are visible.
+- [x] **7.5 Host-indexed `Find`** (BUG-117). Bucket matchers by authority at construction so a lookup evaluates the eligible patterns, not all 838. See the 2026-09-14 build log.
 
 ## Phase 8: Documentation & Ecosystem Adoption
 
@@ -134,7 +135,7 @@ Generic spec mechanics for anyone *serving* oEmbed, extracted from what Emissary
 The `html` field on `video` and `rich` responses is the whole point of oEmbed and also its whole attack surface: it is arbitrary markup, usually script-bearing, authored by a third party we discovered at runtime. "Sanitize it" is a false comfort — strip the scripts and iframes and you've stripped the embed. The honest strategies, in descending order of safety:
 
 1. **Iframe extraction (preferred).** In practice most providers' `html` is exactly one `<iframe src="https://provider/embed/...">`. Parse it; if it is a single iframe and nothing else, discard the provider's markup entirely and rebuild a clean iframe from an allowlist of attributes (`src`, `width`, `height`, `title`, `allow`, `allowfullscreen`), enforcing an `https` src. The provider's content then runs on the provider's origin, isolated by the browser's own cross-origin rules — we never inject their markup into our page at all.
-2. **Sandbox wrapping (fallback).** When `html` is more than one clean iframe (scripts, blockquotes, widget loaders), render it only inside `<iframe srcdoc="..." sandbox="allow-scripts allow-popups">`. The load-bearing rule: **never combine `allow-scripts` with `allow-same-origin` on srcdoc content** — together they let the embedded script reach up and rewrite the host page, which un-sandboxes everything. Size the frame from the response's `width`/`height`, clamped.
+2. **Sandbox wrapping (fallback).** When `html` is more than one clean iframe (scripts, blockquotes, widget loaders), render it only inside `<iframe srcdoc="..." sandbox="allow-scripts allow-popups">`. The important rule: **never combine `allow-scripts` with `allow-same-origin` on srcdoc content** — together they let the embedded script reach up and rewrite the host page, which un-sandboxes everything. Size the frame from the response's `width`/`height`, clamped.
 3. **Degrade to link (last resort).** When policy forbids both (or extraction fails and the caller opts out of srcdoc), fall back to rendering the response as `type=link` — title, thumbnail, and an anchor. A boring preview beats an injected script.
 
 Trust should also be tiered by *how we found the endpoint*: a registry match against the vendored `providers.json` is a curated, known provider; a discovery `<link>` on an arbitrary page is self-asserted and deserves stricter policy (extraction-or-link only, no srcdoc). The embedding page's CSP (`frame-src`) remains the consumer's outer wall; we document what to allow.
@@ -150,7 +151,7 @@ Trust should also be tiered by *how we found the endpoint*: a registry match aga
 
 Ben's ruling. `AllowSandbox` must **not** be derived from registry membership, and this library must **not** report provenance at all (the proposed `Endpoint.Source` field and the `(Response, Endpoint, error)` signature change are dropped).
 
-Two reasons, and the first is the load-bearing one:
+Two reasons, and the first is the important one:
 
 1. **The tier is backwards.** `EmbedSandbox` renders in an iframe with a unique opaque origin — no cookies, no storage, no parent DOM, no navigation. `EmbedIframe`, which is allowed for *every* provider regardless of provenance, loads the provider's own origin with **no sandbox at all**. Gating sandbox on provenance blocks the more contained plan while leaving the less contained one open, so it buys no security.
 2. **It is the wrong question.** Whether script-bearing embeds render at all is a product decision for the site operator, not a trust ranking derived from who appears in a vendored `providers.json` snapshot.
@@ -307,4 +308,37 @@ Public surface after this change: **49 exported symbols**, down from 52.
 
 **Rejected: defining the default registry as a Go literal instead of `providers.json`.** Two reasons. (1) The stated benefit — "save hassle when we deliver an executable" — already exists: `//go:embed` compiles the bytes into the binary. Verified by building a program in a separate module, confirming `youtube.com/oembed` appears in its strings, and running it from a directory containing no `providers.json` (reported all 838 matchers). (2) The cost it would remove is the small half: JSON is 18% of the build time and 2% of the allocations; regex compilation is 86%/98% and a Go literal cannot avoid it. A package-level `[]Provider{...}` literal also cannot live in read-only data — slices need runtime construction — so the generated init code would repeat most of the allocation anyway. Against a realistic few-hundred-microsecond saving: a ~6-9k-line generated file, a code generator to maintain, unreviewable snapshot diffs, and slower compiles.
 
-**Open optimization, NOT done — full spec at `emissary-specs/projects/OEMBED-REGISTRY-HOST-INDEX.md`:** `Find` is a linear scan over all 838 compiled regexes (~100µs/call; sherlock calls it up to 4× per page). Bucketing matchers by literal host — `map[string][]schemeMatcher`, extracted from the same parse that builds the regex — would cut that to ~1µs and make lazy per-bucket compilation viable, which would also shrink the init cost. **The regex must still run; the map is a prefilter, never the decision** — the wildcard-in-authority rule is a security boundary. Wants its own tests and its own fuzz pass.
+**Open optimization — now DONE, see the 2026-09-14 build log below.** `Find` was a linear scan over all 838 compiled regexes (~100µs/call).
+
+## Build Log (2026-09-14) — BUG-117: `Find` indexed by host
+
+`Registry.Find` evaluated all 838 compiled patterns on every call. It now consults an index built in `NewRegistry` and evaluates only the patterns a candidate's authority could reach. **No exported API changed**, and no match changed — the bug register entry is `emissary-specs/bugs/BUG-117-OEmbed-Registry-Linear-Scan.md`, the design is `emissary-specs/projects/OEMBED-REGISTRY-HOST-INDEX.md` §4.
+
+**The index.** `Registry` gains `byAuthority map[string][]int` (literal authorities), `bySuffix map[string][]int` (`*.` authorities, keyed by the suffix *including* its leading dot), and `alwaysCheck []int`. The design document specified one map with `*.`-prefixed keys; two maps is the same thing without the per-lookup `"*" + authority[offset:]` concatenation, which would have allocated once per dot. `compileSchemePattern` now returns the bucket alongside the regexp, from the same parse, so the key and the pattern can never drift.
+
+The snapshot buckets exactly as the design predicted: **728 exact / 105 suffix / 5 always-check** — 833 of 838, 99.4%. A `www.youtube.com` lookup evaluates 11 patterns; a miss on an unknown host evaluates 5.
+
+**Measured, same machine and process (M3 Max, Go 1.25):**
+
+| Case | Before | After | |
+|---|---|---|---|
+| `Find` hit (YouTube) | 91.0 µs, 0 allocs | **1.73 µs**, 0 allocs | 53× |
+| `Find` miss (unknown host) | 106.7 µs, 0 allocs | **1.34 µs**, 0 allocs | 80× |
+| `NewRegistry` | 5.34 ms | 5.45 ms | +2% |
+
+Zero allocations survived: a `[16]int` stack buffer gathers the candidates and `slices.Sort` orders them in place. Construction pays two maps of 430 and 66 keys (+894 allocs), which is noise against 3.9 MB of compiled patterns.
+
+**`findLinear` is kept permanently**, per the design. It is the fallback for unkeyable input *and* the oracle: `FuzzRegistry_FindEquivalence` ran 330,245 executions with no disagreement, and `TestRegistry_FindIndexEquivalence` drives every pattern in the snapshot plus five mutations of each through both implementations.
+
+**Four exactness rules, each with a test that fails without it.** Two were in the design; two were found while proving the equivalence, and both are false negatives — a provider that silently stops matching.
+
+1. *Registry order.* Buckets are merged and re-sorted by matcher index, because `Find` answers with the first match in registry order. (`hazard 1`)
+2. *The apex is not a subdomain.* `*.example.com` compiles to `[^/]*\.example\.com` and requires the literal dot, so the suffix bucket is consulted for `sub.example.com` and never for `example.com`. (`hazard 2`)
+3. *ASCII only, on both sides.* **New.** `(?i)` folds some ASCII letters onto non-ASCII runes — `s` matches U+017F LATIN SMALL LETTER LONG S, `k` matches U+212A KELVIN SIGN — where `strings.ToLower` does not. A non-ASCII authority on either side therefore cannot be keyed and takes `findLinear`. (`hazard 5`)
+4. *No `:` or `/` in a pattern's scheme.* **New.** Such a scheme can match candidate text containing `://` — `:*//` does, when the wildcard expands to nothing — so the candidate's first `://` would not be the one the pattern split on and the two authorities would disagree. No real provider scheme does this; 0 patterns in the snapshot are affected. (`hazard 6`)
+
+**`scopeguard` reports one false positive** in `Registry.add`: moving `index := len(registry.matchers)` into the switch header reads it *after* the append and files every matcher one slot past itself. Applying the suggestion silences the linter and fails four tests; the RULE comment in the code says so.
+
+**Phase 2 (lazy per-bucket compilation) was NOT done**, per the design's own recommendation. It would trade away the property that `Registry` is immutable and copyable with no synchronization, to save a boot cost nobody has complained about.
+
+**Still needs a tag.** `sherlock` and `emissary` both pin `oembed v0.2.0` with no local `replace`, so this reaches Emissary only once Ben tags oembed and sherlock bumps.

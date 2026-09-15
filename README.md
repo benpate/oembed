@@ -77,7 +77,7 @@ err := oembed.WriteResponse(w, response, oembed.FormatJSON)
 
 ## Registry
 
-An embedded snapshot of the official `providers.json` (369 providers, 838 URL patterns) compiles into fast matchers on first use, so the common case — a YouTube or Vimeo link — resolves with **zero page fetches**. Wildcard schemes (`https://*.youtube.com/watch*`), `{format}` substitution, and format negotiation all work as the registry intends. Registries are immutable after construction and safe for concurrent use with no locks.
+An embedded snapshot of the official `providers.json` (369 providers, 838 URL patterns) compiles into fast matchers at startup and is indexed by host, so the common case — a YouTube or Vimeo link — resolves in microseconds with **zero page fetches**. Wildcard schemes (`https://*.youtube.com/watch*`), `{format}` substitution, and format negotiation all work as the registry intends. Registries are immutable after construction and safe for concurrent use with no locks.
 
 The registry earns its keep: Vimeo, Spotify, TikTok, Reddit, GIPHY, Dailymotion, and Instagram serve **no** discovery links in their HTML, so discovery alone cannot resolve them.
 
