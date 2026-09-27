@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	github.com/benpate/derp v0.39.0
 	github.com/benpate/remote v0.24.0
-	github.com/benpate/rosetta v0.35.0
+	github.com/benpate/rosetta v0.43.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/net v0.58.0
 )

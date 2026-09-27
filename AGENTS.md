@@ -6,15 +6,15 @@ See [README.md](README.md) for the tour and [API.md](API.md) for the full refere
 
 ## Response carries NO custom marshalers — the tolerant field types do that job
 
-`Response` marshals and unmarshals through the default encoders in both formats; the `<oembed>` root comes from its `XMLName` tag, which only works *because* there is no `MarshalXML` to override it. Tolerance lives entirely in the `lenient.Int64` and `lenient.String` field types. Don't add a `Response.UnmarshalJSON` back to "fix" a mistyped provider field — give that field a tolerant type instead.
+`Response` marshals and unmarshals through the default encoders in both formats; the `<oembed>` root comes from its `XMLName` tag, which only works *because* there is no `MarshalXML` to override it. Tolerance lives entirely in the `loose.Int64` and `loose.String` field types. Don't add a `Response.UnmarshalJSON` back to "fix" a mistyped provider field — give that field a tolerant type instead.
 
 ## Tolerant scalars live in rosetta now — don't tighten them, and don't fork them
 
-`lenient.Int64` and `lenient.String` are `github.com/benpate/rosetta/lenient`; they used to live here. `Int64` absorbs quoted integers, floats, nulls, and `"100%"` — and it is `Int64`, not `Int`, because `convert.Int` clamps to the *platform* int width and would cap at 2^31 on a 32-bit target; `String` keeps a JSON number's **exact source text**, which is why SoundCloud's `"version": 1.0` becomes `"1.0"` and never `"1"`. Don't replace these fields with plain `int`/`string` — the first `"width": "480"` from a provider would fail the whole unmarshal — and don't re-add a local copy when a provider does something new. Fix it in rosetta, where the fuzz suite is.
+`loose.Int64` and `loose.String` are `github.com/benpate/rosetta/loose`; they used to live here. `Int64` absorbs quoted integers, floats, nulls, and `"100%"` — and it is `Int64`, not `Int`, because `convert.Int` clamps to the *platform* int width and would cap at 2^31 on a 32-bit target; `String` keeps a JSON number's **exact source text**, which is why SoundCloud's `"version": 1.0` becomes `"1.0"` and never `"1"`. Don't replace these fields with plain `int`/`string` — the first `"width": "480"` from a provider would fail the whole unmarshal — and don't re-add a local copy when a provider does something new. Fix it in rosetta, where the fuzz suite is.
 
-`Version` is the only `lenient.String` field, because it is the only field providers are known to mistype. Widening that is a deliberate decision, not a cleanup — every plain `string` field made tolerant also drags its comparison constants into the named type.
+`Version` is the only `loose.String` field, because it is the only field providers are known to mistype. Widening that is a deliberate decision, not a cleanup — every plain `string` field made tolerant also drags its comparison constants into the named type.
 
-`lenient` now ships in a rosetta tag, so **go.mod carries no `replace`**. If one is ever added back for local work, don't run `go mod tidy` and keep the result.
+`loose` ships in rosetta v0.43.0, so **go.mod carries no `replace`**. If one is ever added back for local work, don't run `go mod tidy` and keep the result.
 
 ## Strict on send, lenient on receive — two validators, on purpose
 

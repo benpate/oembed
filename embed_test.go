@@ -3,7 +3,7 @@ package oembed
 import (
 	"testing"
 
-	"github.com/benpate/rosetta/lenient"
+	"github.com/benpate/rosetta/loose"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,8 +13,8 @@ func TestEmbed_CleanIframeExtracts(t *testing.T) {
 		Type:   TypeVideo,
 		Title:  "A Video",
 		HTML:   `  <iframe src="https://player.example.com/v/1" width="640" height="360" allowfullscreen></iframe>  `,
-		Width:  lenient.Int64(853),
-		Height: lenient.Int64(480),
+		Width:  loose.Int64(853),
+		Height: loose.Int64(480),
 	}
 
 	plan := response.Embed(EmbedPolicy{})
@@ -63,8 +63,8 @@ func TestEmbed_SandboxTierWrapsInsteadOfDegrading(t *testing.T) {
 	response := Response{
 		Type:   TypeRich,
 		HTML:   `<blockquote class="widget">Complex</blockquote><script async src="https://widgets.example.com/w.js"></script>`,
-		Width:  lenient.Int64(500),
-		Height: lenient.Int64(600),
+		Width:  loose.Int64(500),
+		Height: loose.Int64(600),
 	}
 
 	plan := response.Embed(EmbedPolicy{AllowSandbox: true})
@@ -98,8 +98,8 @@ func TestEmbed_DimensionClamp(t *testing.T) {
 	response := Response{
 		Type:   TypeVideo,
 		HTML:   `<iframe src="https://player.example.com/v/1" width="9999" height="9999"></iframe>`,
-		Width:  lenient.Int64(9999),
-		Height: lenient.Int64(9999),
+		Width:  loose.Int64(9999),
+		Height: loose.Int64(9999),
 	}
 
 	plan := response.Embed(EmbedPolicy{MaxWidth: 800, MaxHeight: 450})
@@ -119,8 +119,8 @@ func TestEmbed_NegativeDimensionsCollapse(t *testing.T) {
 		response := Response{
 			Type:   TypeVideo,
 			HTML:   `<iframe src="https://player.example.com/v/1"></iframe>`,
-			Width:  lenient.Int64(-1),
-			Height: lenient.Int64(-99),
+			Width:  loose.Int64(-1),
+			Height: loose.Int64(-99),
 		}
 
 		plan := response.Embed(EmbedPolicy{MaxWidth: 800, MaxHeight: 450})
@@ -137,8 +137,8 @@ func TestEmbed_NegativeDimensionsCollapse(t *testing.T) {
 		response := Response{
 			Type:   TypeRich,
 			HTML:   `<b>hi</b><script>alert(1)</script>`,
-			Width:  lenient.Int64(-1),
-			Height: lenient.Int64(-99),
+			Width:  loose.Int64(-1),
+			Height: loose.Int64(-99),
 		}
 
 		plan := response.Embed(EmbedPolicy{AllowSandbox: true})

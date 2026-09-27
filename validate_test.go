@@ -3,7 +3,7 @@ package oembed
 import (
 	"testing"
 
-	"github.com/benpate/rosetta/lenient"
+	"github.com/benpate/rosetta/loose"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -85,7 +85,7 @@ func TestResponse_Validate(t *testing.T) {
 	test("positive cache_age", mutate(valid(TypeLink), func(o *Response) { o.CacheAge = 3600 }), false)
 
 	// Thumbnail all-or-none rule
-	withThumbnail := func(url string, width lenient.Int64, height lenient.Int64) Response {
+	withThumbnail := func(url string, width loose.Int64, height loose.Int64) Response {
 		return mutate(valid(TypeLink), func(o *Response) {
 			o.ThumbnailURL = url
 			o.ThumbnailWidth = width

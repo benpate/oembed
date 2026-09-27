@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/benpate/rosetta/lenient"
+	"github.com/benpate/rosetta/loose"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,8 +37,8 @@ func TestFixtures(t *testing.T) {
 
 		// The thumbnail triple arrives complete
 		assert.NotEmpty(t, parsed.ThumbnailURL)
-		assert.Equal(t, lenient.Int64(480), parsed.ThumbnailWidth)
-		assert.Equal(t, lenient.Int64(360), parsed.ThumbnailHeight)
+		assert.Equal(t, loose.Int64(480), parsed.ThumbnailWidth)
+		assert.Equal(t, loose.Int64(360), parsed.ThumbnailHeight)
 	})
 
 	t.Run("vimeo video with extensions", func(t *testing.T) {
@@ -64,8 +64,8 @@ func TestFixtures(t *testing.T) {
 
 		assert.Equal(t, TypePhoto, parsed.Type)
 		assert.Equal(t, "Flickr", parsed.ProviderName)
-		assert.Equal(t, lenient.Int64(1024), parsed.Width)
-		assert.Equal(t, lenient.Int64(683), parsed.Height)
+		assert.Equal(t, loose.Int64(1024), parsed.Width)
+		assert.Equal(t, loose.Int64(683), parsed.Height)
 		assert.NotEmpty(t, parsed.URL)
 
 		// Flickr's non-specification XML elements (flickr_type, web_page) are
@@ -81,7 +81,7 @@ func TestFixtures(t *testing.T) {
 
 		assert.Equal(t, TypeRich, parsed.Type)
 		assert.Equal(t, "mastodon.social", parsed.ProviderName)
-		assert.Equal(t, lenient.Int64(86400), parsed.CacheAge)
+		assert.Equal(t, loose.Int64(86400), parsed.CacheAge)
 		assert.NotEmpty(t, parsed.HTML)
 	})
 
@@ -93,8 +93,8 @@ func TestFixtures(t *testing.T) {
 
 		assert.Equal(t, TypeRich, parsed.Type)
 		assert.Equal(t, "Spotify", parsed.ProviderName)
-		assert.Equal(t, lenient.Int64(456), parsed.Width)
-		assert.Equal(t, lenient.Int64(152), parsed.Height)
+		assert.Equal(t, loose.Int64(456), parsed.Width)
+		assert.Equal(t, loose.Int64(152), parsed.Height)
 		assert.NotEmpty(t, parsed.HTML)
 		assert.NotEmpty(t, parsed.ThumbnailURL)
 	})
@@ -111,8 +111,8 @@ func TestFixtures(t *testing.T) {
 
 		// TikTok sends width and height as the string "100%" — the tolerant
 		// Int zeroes both, which the lenient receive path reads as "auto"
-		assert.Equal(t, lenient.Int64(0), parsed.Width)
-		assert.Equal(t, lenient.Int64(0), parsed.Height)
+		assert.Equal(t, loose.Int64(0), parsed.Width)
+		assert.Equal(t, loose.Int64(0), parsed.Height)
 	})
 
 	t.Run("soundcloud song with mixed dimension types", func(t *testing.T) {
@@ -130,8 +130,8 @@ func TestFixtures(t *testing.T) {
 
 		// One response, two encodings: width is the string "100%", height is
 		// the number 400
-		assert.Equal(t, lenient.Int64(0), parsed.Width)
-		assert.Equal(t, lenient.Int64(400), parsed.Height)
+		assert.Equal(t, loose.Int64(0), parsed.Width)
+		assert.Equal(t, loose.Int64(400), parsed.Height)
 	})
 
 	t.Run("reddit post without width", func(t *testing.T) {
@@ -144,8 +144,8 @@ func TestFixtures(t *testing.T) {
 		assert.Equal(t, "reddit", parsed.ProviderName)
 
 		// Reddit omits width entirely and sends only a height
-		assert.Equal(t, lenient.Int64(0), parsed.Width)
-		assert.Equal(t, lenient.Int64(316), parsed.Height)
+		assert.Equal(t, loose.Int64(0), parsed.Width)
+		assert.Equal(t, loose.Int64(316), parsed.Height)
 	})
 
 	t.Run("bluesky post with null height", func(t *testing.T) {
@@ -156,8 +156,8 @@ func TestFixtures(t *testing.T) {
 
 		assert.Equal(t, TypeRich, parsed.Type)
 		assert.Equal(t, "Bluesky Social", parsed.ProviderName)
-		assert.Equal(t, lenient.Int64(600), parsed.Width)
-		assert.Equal(t, lenient.Int64(0), parsed.Height, "null height reads as auto")
+		assert.Equal(t, loose.Int64(600), parsed.Width)
+		assert.Equal(t, loose.Int64(0), parsed.Height, "null height reads as auto")
 	})
 
 	t.Run("giphy photo", func(t *testing.T) {
@@ -169,8 +169,8 @@ func TestFixtures(t *testing.T) {
 		assert.Equal(t, TypePhoto, parsed.Type)
 		assert.Equal(t, "GIPHY", parsed.ProviderName)
 		assert.NotEmpty(t, parsed.URL)
-		assert.Equal(t, lenient.Int64(480), parsed.Width)
-		assert.Equal(t, lenient.Int64(480), parsed.Height)
+		assert.Equal(t, loose.Int64(480), parsed.Width)
+		assert.Equal(t, loose.Int64(480), parsed.Height)
 	})
 }
 

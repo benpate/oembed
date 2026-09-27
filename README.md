@@ -132,7 +132,7 @@ Your page's own CSP remains the outer wall — `frame-src` should allow the play
 
 ### Strict on send, liberal on receive
 
-Providers infamously send `"width": "480"` as a string, floats where integers belong, `null` heights for auto-sized embeds, and — in SoundCloud's case — `"version": 1.0` as a JSON *number*. Two tolerant field types from [rosetta/lenient](https://github.com/benpate/rosetta/tree/main/lenient) absorb all of it: `lenient.Int64` for the dimensions and `lenient.String` for the version, which keeps a number's exact source text so `1.0` stays `"1.0"`. Received documents are then accepted whenever their essential payload is usable; a missing dimension simply means "auto". `Response.Validate()` stays the strict spec check for documents *you* author, so tolerance never leaks into what you publish.
+Providers infamously send `"width": "480"` as a string, floats where integers belong, `null` heights for auto-sized embeds, and — in SoundCloud's case — `"version": 1.0` as a JSON *number*. Two tolerant field types from [rosetta/loose](https://github.com/benpate/rosetta/tree/main/loose) absorb all of it: `loose.Int64` for the dimensions and `loose.String` for the version, which keeps a number's exact source text so `1.0` stays `"1.0"`. Received documents are then accepted whenever their essential payload is usable; a missing dimension simply means "auto". `Response.Validate()` stays the strict spec check for documents *you* author, so tolerance never leaks into what you publish.
 
 ### Formats
 

@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/benpate/derp"
-	"github.com/benpate/rosetta/lenient"
+	"github.com/benpate/rosetta/loose"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -99,7 +99,7 @@ func TestResponse_JSONUnmarshalErrors(t *testing.T) {
 	t.Run("bad width tolerated", func(t *testing.T) {
 		var parsed Response
 		require.NoError(t, json.Unmarshal([]byte(`{"type":"photo","width":"abc"}`), &parsed))
-		assert.Equal(t, lenient.Int64(0), parsed.Width)
+		assert.Equal(t, loose.Int64(0), parsed.Width)
 	})
 }
 
@@ -120,7 +120,7 @@ func TestResponse_JSONMistypedFields(t *testing.T) {
 		require.NoError(t, json.Unmarshal([]byte(input), &parsed))
 
 		assert.Equal(t, Version, parsed.Version, "numeric version keeps its source text")
-		assert.Equal(t, lenient.Int64(400), parsed.Height, "quoted height parses")
+		assert.Equal(t, loose.Int64(400), parsed.Height, "quoted height parses")
 		assert.Equal(t, TypeRich, parsed.Type, "correctly-typed fields pass through")
 	})
 
@@ -187,7 +187,7 @@ func TestResponse_XMLUnmarshalErrors(t *testing.T) {
 	t.Run("bad width tolerated", func(t *testing.T) {
 		var parsed Response
 		require.NoError(t, xml.Unmarshal([]byte(`<oembed><width>abc</width></oembed>`), &parsed))
-		assert.Equal(t, lenient.Int64(0), parsed.Width)
+		assert.Equal(t, loose.Int64(0), parsed.Width)
 	})
 }
 
@@ -350,8 +350,8 @@ func TestBuilders(t *testing.T) {
 
 		assert.Equal(t, TypePhoto, response.Type)
 		assert.Equal(t, "https://example.com/photo.jpg", response.URL)
-		assert.Equal(t, lenient.Int64(800), response.Width)
-		assert.Equal(t, lenient.Int64(600), response.Height)
+		assert.Equal(t, loose.Int64(800), response.Width)
+		assert.Equal(t, loose.Int64(600), response.Height)
 		assert.NoError(t, response.Validate())
 	})
 
@@ -388,8 +388,8 @@ func TestResponse_SetThumbnail(t *testing.T) {
 		response.SetThumbnail("https://example.com/thumb.png", 300, 200)
 
 		assert.Equal(t, "https://example.com/thumb.png", response.ThumbnailURL)
-		assert.Equal(t, lenient.Int64(300), response.ThumbnailWidth)
-		assert.Equal(t, lenient.Int64(200), response.ThumbnailHeight)
+		assert.Equal(t, loose.Int64(300), response.ThumbnailWidth)
+		assert.Equal(t, loose.Int64(200), response.ThumbnailHeight)
 		assert.NoError(t, response.Validate())
 	})
 

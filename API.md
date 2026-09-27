@@ -185,20 +185,20 @@ A resolved endpoint. `Registry.Find` is the only public producer; the discovery 
 type Response struct {
 	XMLName         xml.Name       `json:"-"                          xml:"oembed"`
 	Type            string         `json:"type"                       xml:"type"`
-	Version         lenient.String `json:"version"                    xml:"version"`
+	Version         loose.String `json:"version"                    xml:"version"`
 	Title           string         `json:"title,omitempty"            xml:"title,omitempty"`
 	AuthorName      string         `json:"author_name,omitempty"      xml:"author_name,omitempty"`
 	AuthorURL       string         `json:"author_url,omitempty"       xml:"author_url,omitempty"`
 	ProviderName    string         `json:"provider_name,omitempty"    xml:"provider_name,omitempty"`
 	ProviderURL     string         `json:"provider_url,omitempty"     xml:"provider_url,omitempty"`
-	CacheAge        lenient.Int64  `json:"cache_age,omitempty"        xml:"cache_age,omitempty"`
+	CacheAge        loose.Int64  `json:"cache_age,omitempty"        xml:"cache_age,omitempty"`
 	ThumbnailURL    string         `json:"thumbnail_url,omitempty"    xml:"thumbnail_url,omitempty"`
-	ThumbnailWidth  lenient.Int64  `json:"thumbnail_width,omitempty"  xml:"thumbnail_width,omitempty"`
-	ThumbnailHeight lenient.Int64  `json:"thumbnail_height,omitempty" xml:"thumbnail_height,omitempty"`
+	ThumbnailWidth  loose.Int64  `json:"thumbnail_width,omitempty"  xml:"thumbnail_width,omitempty"`
+	ThumbnailHeight loose.Int64  `json:"thumbnail_height,omitempty" xml:"thumbnail_height,omitempty"`
 	URL             string         `json:"url,omitempty"              xml:"url,omitempty"`
 	HTML            string         `json:"html,omitempty"             xml:"html,omitempty"`
-	Width           lenient.Int64  `json:"width,omitempty"            xml:"width,omitempty"`
-	Height          lenient.Int64  `json:"height,omitempty"           xml:"height,omitempty"`
+	Width           loose.Int64  `json:"width,omitempty"            xml:"width,omitempty"`
+	Height          loose.Int64  `json:"height,omitempty"           xml:"height,omitempty"`
 }
 ```
 
@@ -210,10 +210,10 @@ Every parameter in oEmbed 1.0 §2.3.4. Marshals to and from both JSON and XML (r
 
 ### Tolerant field types
 
-Three fields are typed for what providers actually send, using [`rosetta/lenient`](https://github.com/benpate/rosetta/tree/main/lenient):
+Three fields are typed for what providers actually send, using [`rosetta/loose`](https://github.com/benpate/rosetta/tree/main/loose):
 
-- **`lenient.Int64`** (dimensions, cache age) — accepts quoted integers (`"480"`), floats (truncating), `null` and `"100%"` (both → 0, meaning "auto"). Out-of-range values clamp; nothing errors. Top-level integers are read from their source text, so values above 2^53 stay exact.
-- **`lenient.String`** (`Version` only) — keeps a JSON number's exact source text, which is why SoundCloud's `"version": 1.0` becomes `"1.0"` and never `"1"`.
+- **`loose.Int64`** (dimensions, cache age) — accepts quoted integers (`"480"`), floats (truncating), `null` and `"100%"` (both → 0, meaning "auto"). Out-of-range values clamp; nothing errors. Top-level integers are read from their source text, so values above 2^53 stay exact.
+- **`loose.String`** (`Version` only) — keeps a JSON number's exact source text, which is why SoundCloud's `"version": 1.0` becomes `"1.0"` and never `"1"`.
 
 `Version` is the *only* tolerant string field. The other string fields reject a mistyped scalar, failing the document.
 
@@ -339,7 +339,7 @@ Your page's own CSP remains the outer wall. `frame-src` should allow the player 
 
 | Constant | Value |
 |---|---|
-| `Version` | `"1.0"` — typed `lenient.String` to match the field |
+| `Version` | `"1.0"` — typed `loose.String` to match the field |
 | `TypePhoto` | `"photo"` — requires url, width, height |
 | `TypeVideo` | `"video"` — requires html, width, height |
 | `TypeLink` | `"link"` — no embeddable content |

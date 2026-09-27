@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/benpate/derp"
-	"github.com/benpate/rosetta/lenient"
+	"github.com/benpate/rosetta/loose"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -77,7 +77,7 @@ func TestClient_Fetch_RegistryHit(t *testing.T) {
 	// The response parsed and validated
 	assert.Equal(t, TypeVideo, result.Type)
 	assert.Equal(t, "Test Video", result.Title)
-	assert.Equal(t, lenient.Int64(640), result.Width)
+	assert.Equal(t, loose.Int64(640), result.Width)
 
 	// The request carried the spec parameters, URL-encoded
 	assert.Equal(t, "https://example.com/video/1", receivedQuery["url"])
@@ -179,7 +179,7 @@ func TestClient_Fetch_XMLEndpoint(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, TypePhoto, result.Type)
-	assert.Equal(t, lenient.Int64(1024), result.Width)
+	assert.Equal(t, loose.Int64(1024), result.Width)
 	assert.Equal(t, "https://example.com/photo.jpg", result.URL)
 }
 

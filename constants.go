@@ -1,13 +1,13 @@
 package oembed
 
-import "github.com/benpate/rosetta/lenient"
+import "github.com/benpate/rosetta/loose"
 
 /******************************************
  * Specification Constants
  ******************************************/
 
 // Version is the only version of the oEmbed specification, required in every response.
-const Version lenient.String = "1.0"
+const Version loose.String = "1.0"
 
 // TypePhoto identifies a static photo response (requires url, width, height)
 const TypePhoto = "photo"
