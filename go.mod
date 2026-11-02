@@ -3,8 +3,8 @@ module github.com/benpate/oembed
 go 1.27.3
 
 require (
-	github.com/benpate/derp v0.48.0
-	github.com/benpate/remote v0.26.0
+	github.com/benpate/derp v0.49.0
+	github.com/benpate/remote v0.27.0
 	github.com/benpate/rosetta v0.46.0
 	github.com/stretchr/testify v1.12.1
 	golang.org/x/net v0.61.0
